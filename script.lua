@@ -1,298 +1,298 @@
--- =====================================================
--- ADMIN TEST SYSTEM - TUDO EM UM ÚNICO MODULESCRIPT
--- ADM DEV 1.0 Lord Santos
--- Tema amarelo moderno | Menu com K | Simulações de Anticheat
--- =====================================================
+-- ================================================
+-- CHEAT LUA - SCRIPT COMPLETO EM UM ÚNICO ARQUIVO
+-- FPS Hacker para o seu jogo (feito por Grok)
+-- Abra/fecha o menu com a tecla K
+-- Tudo pronto pra você subir no GitHub
+-- ================================================
 
-local AdminTestSystem = {}
+local Cheat = {}
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
+-- ====================== CONFIGURAÇÕES ======================
+Cheat.Config = {
+    enabled = true,
 
-local localPlayer = Players.LocalPlayer
-local playerGui = localPlayer:WaitForChild("PlayerGui")
+    aimbot = {
+        enabled = true,
+        fov = 120,
+        smooth = 0.35,
+        bone = "head",          -- "head", "chest", "spine"
+        teamCheck = true,
+        visibleCheck = true
+    },
 
--- ==================== LOGGER ====================
-local function Log(message, level)
-	level = level or "INFO"
-	local timestamp = os.date("%X")
-	print(string.format("[%s] [%s] %s", timestamp, level, message))
+    esp = {
+        enabled = true,
+        boxes = true,
+        names = true,
+        health = true,
+        distance = true,
+        color_enemy = {1, 0, 0, 1},
+        color_ally  = {0, 1, 0, 1}
+    },
+
+    triggerbot = { enabled = true, delay = 0 },
+    norecoil   = { enabled = true, intensity = 0.7 },
+    speedhack  = { enabled = false, multiplier = 1.8 },
+    bhop       = { enabled = true }
+}
+
+-- ====================== UTILS (adapte pro seu motor) ======================
+Cheat.Utils = {}
+
+function Cheat.Utils.GetLocalPlayer()
+    -- SUBSTITUA pela função do SEU jogo
+    return game:GetService("Players").LocalPlayer  -- exemplo Roblox/Lua
 end
 
--- ==================== DETECTION (Flags + Stats) ====================
-local playerData = {}
-
-local function RegisterPlayer(player)
-	if playerData[player] then return end
-	playerData[player] = {
-		flags = { AIM = 0, VISÃO = 0, VELOCIDADE = 0 },
-		accuracy = 0,
-		reactionTime = 0,
-		speed = 16,
-		noLosTracks = 0
-	}
-	Log("Detection: Jogador registrado - " .. player.Name)
+function Cheat.Utils.GetPlayers()
+    -- Retorna todos os jogadores (menos o local)
+    local players = {}
+    -- Exemplo: for _, plr in ipairs(game.Players:GetPlayers()) do
+    return players
 end
 
-local function UpdatePlayerStats(player, accuracy, reactionTime, speed, noLosTracks)
-	local data = playerData[player]
-	if not data then return end
-	
-	if accuracy then data.accuracy = accuracy end
-	if reactionTime then data.reactionTime = reactionTime end
-	if speed then data.speed = speed end
-	if noLosTracks then data.noLosTracks = noLosTracks end
-	
-	Log(string.format(
-		"Stats → %s | Accuracy=%.1f%% | Reaction=%.2fs | Speed=%.1f | NoLOS=%d",
-		player.Name, data.accuracy, data.reactionTime, data.speed, data.noLosTracks
-	))
-	
-	-- Verifica flags suspeitas
-	if data.accuracy > 85 then
-		data.flags.AIM = data.flags.AIM + 1
-		Log("FLAG [AIM] - Alta precisão! Total: " .. data.flags.AIM, "WARN")
-	end
-	
-	if data.speed > 40 then
-		data.flags.VELOCIDADE = data.flags.VELOCIDADE + 1
-		Log("FLAG [VELOCIDADE] - Velocidade anormal! Total: " .. data.flags.VELOCIDADE, "WARN")
-	end
-	
-	if data.noLosTracks > 0 then
-		data.flags.VISÃO = data.flags.VISÃO + 1
-		Log("FLAG [VISÃO] - Rastreamento sem LOS! Total: " .. data.flags.VISÃO, "WARN")
-	end
+function Cheat.Utils.WorldToScreen(pos)
+    -- Retorna {x = num, y = num, onScreen = bool} ou nil
+    -- Implemente com a câmera do seu jogo
+    return {x = 0, y = 0, onScreen = false}
 end
 
--- ==================== PLAYER SIMULATION ====================
-local aimConnection = nil
-local moveConnection = nil
-
-local function SpawnTestDummies(count)
-	count = count or 5
-	local character = localPlayer.Character
-	if not character or not character:FindFirstChild("HumanoidRootPart") then
-		Log("Erro: Character não encontrado!", "ERROR")
-		return
-	end
-	
-	local rootPos = character.HumanoidRootPart.Position
-	for i = 1, count do
-		local dummy = Instance.new("Model")
-		dummy.Name = "TestDummy" .. i
-		
-		local humanoid = Instance.new("Humanoid")
-		humanoid.Parent = dummy
-		
-		local rootPart = Instance.new("Part")
-		rootPart.Name = "HumanoidRootPart"
-		rootPart.Size = Vector3.new(2, 2, 1)
-		rootPart.Position = rootPos + Vector3.new(math.random(-30, 30), 5, math.random(-30, 30))
-		rootPart.Anchored = false
-		rootPart.CanCollide = true
-		rootPart.Parent = dummy
-		
-		dummy.PrimaryPart = rootPart
-		dummy.Parent = workspace
-		
-		Log("Dummy de teste #" .. i .. " criado")
-	end
+function Cheat.Utils.IsVisible(ent)
+    -- Raycast do local até o alvo
+    return true  -- adapte
 end
 
-function AdminTestSystem.StartAimSimulation()
-	if aimConnection then return end
-	
-	RegisterPlayer(localPlayer)
-	SpawnTestDummies()
-	
-	aimConnection = RunService.Heartbeat:Connect(function()
-		local character = localPlayer.Character
-		if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-		
-		local root = character.HumanoidRootPart
-		local target = nil
-		local closest = math.huge
-		
-		for _, obj in ipairs(workspace:GetChildren()) do
-			if obj.Name:find("TestDummy") and obj:FindFirstChild("HumanoidRootPart") then
-				local dist = (root.Position - obj.HumanoidRootPart.Position).Magnitude
-				if dist < closest then
-					closest = dist
-					target = obj.HumanoidRootPart
-				end
-			end
-		end
-		
-		if target then
-			root.CFrame = CFrame.lookAt(root.Position, target.Position)
-			UpdatePlayerStats(localPlayer, 98, 0.08, nil, nil)
-			Log("Simulação de mira de alta precisão ativa (testando AIM)")
-		end
-	end)
-	
-	Log("✅ SIMULAÇÃO DE MIRA ALTA PRECISÃO INICIADA")
+function Cheat.Utils.GetBonePosition(player, bone)
+    -- Retorna posição do osso (vector)
+    return player.Position or {x=0,y=0,z=0}
 end
 
-function AdminTestSystem.StartMovementSimulation()
-	if moveConnection then return end
-	
-	local character = localPlayer.Character
-	if not character or not character:FindFirstChild("Humanoid") then return end
-	local humanoid = character.Humanoid
-	
-	RegisterPlayer(localPlayer)
-	
-	moveConnection = RunService.Heartbeat:Connect(function()
-		local speed = 16 + math.random(0, 84) -- até 100
-		humanoid.WalkSpeed = speed
-		UpdatePlayerStats(localPlayer, nil, nil, speed, nil)
-	end)
-	
-	Log("✅ SIMULAÇÃO DE MOVIMENTAÇÃO RÁPIDA INICIADA")
+-- Funções de desenho (exemplo com Love2D - adapte pro seu framework)
+function Cheat.Utils.DrawRect(x, y, w, h, color)
+    love.graphics.setColor(color)
+    love.graphics.rectangle("line", x, y, w, h)
 end
 
-function AdminTestSystem.SimulateVisionTracking()
-	RegisterPlayer(localPlayer)
-	UpdatePlayerStats(localPlayer, nil, nil, nil, 5)
-	Log("✅ SIMULAÇÃO DE RASTREAMENTO SEM LINHA DE VISÃO (testando VISÃO)")
+function Cheat.Utils.DrawText(text, x, y, color)
+    love.graphics.setColor(color or {1,1,1,1})
+    love.graphics.print(text, x, y)
 end
 
-function AdminTestSystem.StopAllSimulations()
-	if aimConnection then aimConnection:Disconnect() aimConnection = nil end
-	if moveConnection then moveConnection:Disconnect() moveConnection = nil end
-	
-	local humanoid = localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid")
-	if humanoid then humanoid.WalkSpeed = 16 end
-	
-	Log("⛔ Todas as simulações paradas")
+function Cheat.Utils.DrawLine(x1,y1,x2,y2,color)
+    love.graphics.setColor(color)
+    love.graphics.line(x1,y1,x2,y2)
 end
 
--- ==================== UI (MENU COM TECLA K) ====================
-local menuGui = nil
-local menuOpen = false
+-- ====================== MÓDULOS (tudo dentro do Cheat) ======================
 
-local function CreateMenu()
-	if menuGui then return menuGui end
-	
-	menuGui = Instance.new("ScreenGui")
-	menuGui.Name = "AdminDevMenu"
-	menuGui.ResetOnSpawn = false
-	menuGui.Parent = playerGui
-	
-	local mainFrame = Instance.new("Frame")
-	mainFrame.Size = UDim2.new(0.35, 0, 0.55, 0)
-	mainFrame.Position = UDim2.new(0.325, 0, 0.225, 0)
-	mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-	mainFrame.BorderSizePixel = 0
-	mainFrame.Parent = menuGui
-	
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 16)
-	corner.Parent = mainFrame
-	
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(255, 215, 0)
-	stroke.Thickness = 3
-	stroke.Parent = mainFrame
-	
-	-- Título
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, 0, 0.18, 0)
-	title.BackgroundTransparency = 1
-	title.Text = "adm dev 1.0 Lord Santos"
-	title.TextColor3 = Color3.fromRGB(255, 215, 0)
-	title.TextScaled = true
-	title.Font = Enum.Font.GothamBold
-	title.Parent = mainFrame
-	
-	-- Botões
-	local buttonsFrame = Instance.new("Frame")
-	buttonsFrame.Size = UDim2.new(1, 0, 0.82, 0)
-	buttonsFrame.Position = UDim2.new(0, 0, 0.18, 0)
-	buttonsFrame.BackgroundTransparency = 1
-	buttonsFrame.Parent = mainFrame
-	
-	local listLayout = Instance.new("UIListLayout")
-	listLayout.Padding = UDim.new(0, 12)
-	listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	listLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-	listLayout.Parent = buttonsFrame
-	
-	local function createButton(text, callback)
-		local btn = Instance.new("TextButton")
-		btn.Size = UDim2.new(0.85, 0, 0, 60)
-		btn.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
-		btn.Text = text
-		btn.TextColor3 = Color3.fromRGB(0, 0, 0)
-		btn.TextScaled = true
-		btn.Font = Enum.Font.GothamSemibold
-		btn.Parent = buttonsFrame
-		
-		local btnCorner = Instance.new("UICorner")
-		btnCorner.CornerRadius = UDim.new(0, 12)
-		btnCorner.Parent = btn
-		
-		btn.MouseButton1Click:Connect(callback)
-		return btn
-	end
-	
-	createButton("Jogar", function()
-		menuGui.Enabled = false
-		menuOpen = false
-		Log("UI: Modo Jogar ativado")
-	end)
-	
-	createButton("Configurações", function()
-		Log("UI: Configurações clicado (expanda conforme necessário)")
-	end)
-	
-	createButton("Teste de Mira", function()
-		AdminTestSystem.StartAimSimulation()
-	end)
-	
-	menuGui.Enabled = false
-	return menuGui
+-- AIMBOT
+Cheat.Aimbot = {}
+function Cheat.Aimbot.GetBestTarget()
+    if not Cheat.Config.aimbot.enabled then return nil end
+    local localPlayer = Cheat.Utils.GetLocalPlayer()
+    local bestTarget = nil
+    local bestFov = Cheat.Config.aimbot.fov
+
+    for _, player in ipairs(Cheat.Utils.GetPlayers()) do
+        if player ~= localPlayer and (not Cheat.Config.aimbot.teamCheck or player.team ~= localPlayer.team) then
+            local headPos = Cheat.Utils.GetBonePosition(player, Cheat.Config.aimbot.bone)
+            local screen = Cheat.Utils.WorldToScreen(headPos)
+
+            if screen and screen.onScreen then
+                local centerX, centerY = love.graphics.getWidth()/2, love.graphics.getHeight()/2
+                local dist = math.sqrt((screen.x - centerX)^2 + (screen.y - centerY)^2)
+
+                if dist < bestFov and (not Cheat.Config.aimbot.visibleCheck or Cheat.Utils.IsVisible(player)) then
+                    bestFov = dist
+                    bestTarget = player
+                end
+            end
+        end
+    end
+    return bestTarget
 end
 
--- ==================== CONTROLE DE TECLA K ====================
-function AdminTestSystem.ToggleMenu()
-	menuOpen = not menuOpen
-	if not menuGui then
-		menuGui = CreateMenu()
-	end
-	menuGui.Enabled = menuOpen
-	
-	if menuOpen then
-		Log("UI: Menu aberto (tecla K)")
-	else
-		Log("UI: Menu fechado (tecla K)")
-	end
+function Cheat.Aimbot.Update()
+    local target = Cheat.Aimbot.GetBestTarget()
+    if not target then return end
+
+    local targetPos = Cheat.Utils.GetBonePosition(target, Cheat.Config.aimbot.bone)
+    local localAngles = Cheat.Utils.GetLocalPlayer().ViewAngles  -- adapte
+
+    local newAngles = localAngles:LookAt(targetPos)  -- adapte
+    newAngles = localAngles:Lerp(newAngles, Cheat.Config.aimbot.smooth)
+
+    Cheat.Utils.GetLocalPlayer().ViewAngles = newAngles  -- adapte
 end
 
--- ==================== INICIALIZAÇÃO ====================
-function AdminTestSystem.Init()
-	Log("=== SISTEMA BASE DE TESTE ANTICHEAT - ADM DEV 1.0 Lord Santos INICIADO ===")
-	
-	-- Cria o menu na inicialização
-	CreateMenu()
-	
-	-- Tecla K para abrir/fechar
-	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if input.KeyCode == Enum.KeyCode.K then
-			AdminTestSystem.ToggleMenu()
-		end
-	end)
-	
-	Log("✅ Sistema carregado com sucesso!")
-	Log("Pressione K para abrir o menu amarelo")
-	Log("Comandos extras disponíveis:")
-	Log("   AdminTestSystem.StartMovementSimulation()")
-	Log("   AdminTestSystem.SimulateVisionTracking()")
-	Log("   AdminTestSystem.StopAllSimulations()")
+-- ESP
+Cheat.ESP = {}
+function Cheat.ESP.Draw()
+    if not Cheat.Config.esp.enabled then return end
+
+    for _, player in ipairs(Cheat.Utils.GetPlayers()) do
+        local pos = player.Position  -- adapte
+        local screen = Cheat.Utils.WorldToScreen(pos)
+        if not screen or not screen.onScreen then goto continue end
+
+        local headScreen = Cheat.Utils.WorldToScreen(Cheat.Utils.GetBonePosition(player, "head"))
+        local footScreen = Cheat.Utils.WorldToScreen(Cheat.Utils.GetBonePosition(player, "spine"))
+
+        if not headScreen or not footScreen then goto continue end
+
+        local height = headScreen.y - footScreen.y
+        local width = height / 2.2
+        local x = headScreen.x - width / 2
+        local y = headScreen.y
+
+        local color = (player.team == Cheat.Utils.GetLocalPlayer().team) and Cheat.Config.esp.color_ally or Cheat.Config.esp.color_enemy
+
+        if Cheat.Config.esp.boxes then
+            Cheat.Utils.DrawRect(x, y, width, height, color)
+        end
+
+        if Cheat.Config.esp.names then
+            local dist = (pos - Cheat.Utils.GetLocalPlayer().Position).magnitude or 0
+            Cheat.Utils.DrawText(player.name .. " [" .. math.floor(dist) .. "m]", x, y - 18, {1,1,1,1})
+        end
+
+        ::continue::
+    end
 end
 
-return AdminTestSystem
+-- TRIGGERBOT
+Cheat.Triggerbot = {}
+function Cheat.Triggerbot.Update()
+    if not Cheat.Config.triggerbot.enabled then return end
+    -- Aqui você coloca o raycast do crosshair e atira automaticamente
+    -- Exemplo: if IsEnemyUnderCrosshair() then Shoot() end
+end
+
+-- NORECOIL
+Cheat.NoRecoil = {}
+function Cheat.NoRecoil.Apply(recoilVector)
+    if not Cheat.Config.norecoil.enabled then return recoilVector end
+    return recoilVector * (1 - Cheat.Config.norecoil.intensity)
+end
+
+-- SPEEDHACK (chame no update do movimento do player)
+Cheat.Speedhack = {}
+function Cheat.Speedhack.Apply(speed)
+    if not Cheat.Config.speedhack.enabled then return speed end
+    return speed * Cheat.Config.speedhack.multiplier
+end
+
+-- BHOP
+Cheat.Bhop = {}
+function Cheat.Bhop.Update()
+    if not Cheat.Config.bhop.enabled then return end
+    -- Se estiver no chão e apertar espaço → pula novamente
+end
+
+-- ====================== MENU (abre/fecha com K) ======================
+Cheat.Menu = {
+    open = false,
+    selected = 1,
+    options = {
+        {name = "Aimbot",          key = "aimbot"},
+        {name = "ESP",             key = "esp"},
+        {name = "Triggerbot",      key = "triggerbot"},
+        {name = "No Recoil",       key = "norecoil"},
+        {name = "Speedhack",       key = "speedhack"},
+        {name = "Bunny Hop",       key = "bhop"},
+        {name = "Ativar/Desativar Tudo", key = "global"}
+    }
+}
+
+function Cheat.Menu.Toggle()
+    Cheat.Menu.open = not Cheat.Menu.open
+end
+
+function Cheat.Menu.Draw()
+    if not Cheat.Menu.open then return end
+
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+    love.graphics.setColor(0, 0, 0, 0.85)
+    love.graphics.rectangle("fill", w/2 - 200, 100, 400, 400)
+
+    love.graphics.setColor(0, 1, 1, 1)
+    love.graphics.print("=== MENU HACKER FPS ===", w/2 - 120, 120)
+    love.graphics.print("Pressione K para fechar", w/2 - 130, 145)
+
+    for i, opt in ipairs(Cheat.Menu.options) do
+        local y = 180 + (i-1)*35
+        local active = Cheat.Config[opt.key] and Cheat.Config[opt.key].enabled or (opt.key == "global" and Cheat.Config.enabled)
+
+        love.graphics.setColor(1,1,1,1)
+        if i == Cheat.Menu.selected then
+            love.graphics.print("→", w/2 - 180, y)
+        end
+
+        love.graphics.print(opt.name, w/2 - 150, y)
+        love.graphics.print(active and "[ON]" or "[OFF]", w/2 + 100, y)
+    end
+
+    love.graphics.setColor(1,1,1,0.6)
+    love.graphics.print("Setas ↑↓ = selecionar | ENTER = toggle", w/2 - 170, 460)
+end
+
+function Cheat.Menu.KeyPressed(key)
+    if not Cheat.Menu.open then return end
+
+    if key == "up" then
+        Cheat.Menu.selected = math.max(1, Cheat.Menu.selected - 1)
+    elseif key == "down" then
+        Cheat.Menu.selected = math.min(#Cheat.Menu.options, Cheat.Menu.selected + 1)
+    elseif key == "return" then
+        local opt = Cheat.Menu.options[Cheat.Menu.selected]
+        if opt.key == "global" then
+            Cheat.Config.enabled = not Cheat.Config.enabled
+        else
+            if Cheat.Config[opt.key] then
+                Cheat.Config[opt.key].enabled = not Cheat.Config[opt.key].enabled
+            end
+        end
+    end
+end
+
+-- ====================== FUNÇÕES PRINCIPAIS (chame no seu jogo) ======================
+
+-- Chame isso no love.keypressed(key) ou no seu input handler
+function Cheat:KeyPressed(key)
+    if key == "k" then
+        Cheat.Menu.Toggle()
+        return
+    end
+
+    Cheat.Menu.KeyPressed(key)
+end
+
+-- Chame isso todo frame no Update(dt) do seu jogo
+function Cheat:Update(dt)
+    if not Cheat.Config.enabled then return end
+
+    Cheat.Aimbot.Update()
+    Cheat.Triggerbot.Update()
+    Cheat.Bhop.Update()
+    -- Speedhack e NoRecoil são aplicados onde você movimenta o player
+end
+
+-- Chame isso no Draw() do seu jogo (depois do resto do jogo)
+function Cheat:Draw()
+    Cheat.ESP.Draw()
+    Cheat.Menu.Draw()
+end
+
+-- ====================== INICIALIZAÇÃO ======================
+print("✅ Cheat Lua carregado com sucesso!")
+print("   Pressione K para abrir o menu")
+
+-- Para usar no seu jogo:
+-- 1. Coloque esse arquivo como "cheat.lua"
+-- 2. No seu main.lua faça:
+--    local Cheat = require("cheat")
+--    function love.keypressed(key) Cheat:KeyPressed(key) end
+--    function love.update(dt) Cheat:Update(dt) end
+--    function love.draw() Cheat:Draw() end
+
+return Cheat
